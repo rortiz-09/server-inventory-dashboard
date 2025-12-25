@@ -98,26 +98,6 @@ def normalizar_sistema_operativo(valor: Any) -> str:
     return "Otro"
 
 
-def normalizar_booleano(valor: Any) -> bool:
-    """
-    Convierte diversos formatos de respuesta a booleano.
-    
-    Args:
-        valor: Valor que puede ser 'SI', 'YES', 'X', etc.
-        
-    Returns:
-        True o False
-    """
-    # Verificar si es nulo de manera segura
-    try:
-        if valor is None or (isinstance(valor, float) and pd.isna(valor)):
-            return False
-    except (ValueError, TypeError):
-        pass
-    
-    valor_str = str(valor).upper().strip()
-    return valor_str in ["SI", "SÍ", "S", "YES", "TRUE", "X", "1"]
-
 
 def extraer_segmento_ip(valor: Any) -> str:
     """
@@ -281,16 +261,10 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
         df['ip_segment'] = df['ip'].apply(extraer_segmento_ip)
     
     # Paso 9: Limpiar hostname (convertir None a string legible)
-    if 'hostname' in df.columns:
-        df['hostname'] = df['hostname'].apply(lambda x: str(x) if pd.notna(x) else 'SIN HOSTNAME')
-    
     return df
 
 
-# Alias para compatibilidad con código existente
+# Alias para compatibilidad
 clean_data = limpiar_datos
-clean_column_names = limpiar_nombres_columnas
-normalize_server_type = normalizar_tipo_servidor
-normalize_os = normalizar_sistema_operativo
-normalize_boolean = normalizar_booleano
-get_ip_segment = extraer_segmento_ip
+
+
