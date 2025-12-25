@@ -65,3 +65,9 @@ uv run pytest
 ├── tests/              # Tests Unitarios
 └── Dockerfile          # Definición de Contenedor
 ```
+
+## License & Credits
+
+This project is licensed under the MIT License.
+
+Created and maintained by **Ronny Ortiz**.
