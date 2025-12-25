@@ -1,0 +1,19 @@
+[project]
+name = "panel-lider-plataforma"
+version = "0.1.0"
+description = "Dashboard de Control de Inventario"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "streamlit>=1.39.0",
+    "pandas>=2.2.0",
+    "plotly>=5.18.0",
+    "openpyxl>=3.1.0",
+    "pydantic>=2.0.0",
+]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
+pythonpath = ["."]

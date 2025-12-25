@@ -1,0 +1,12 @@
+# Configuración de Streamlit - Panel de Control de Plataforma
+# ============================================================
+# NO definimos ningún tema para permitir selección libre del usuario
+# mediante: Settings → Choose app theme
+
+[server]
+headless = true
+port = 8501
+address = "0.0.0.0"
+
+[browser]
+gatherUsageStats = false
