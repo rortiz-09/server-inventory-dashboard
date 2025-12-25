@@ -1,73 +1,103 @@
-# 🛡️ Platform Control Dashboard
+# 🛡️ Control de Plataforma Xtrim
 
-Dashboard ejecutivo para el control de inventario de servidores, riesgos y cumplimiento.
+> **Radiografía Ejecutiva de Infraestructura, FinOps y Gobierno de Datos.**
 
-## 📋 Características
+Dashboard profesional desarrollado en **Python + Streamlit** para la gestión integral del inventario de servidores de Xtrim. Proporciona visibilidad en tiempo real sobre capacidad, riesgos operativos, costos (FinOps) y calidad de los datos.
 
-- **Ingesta de Datos:** Carga tolerante a fallos de Excel desordenado (`data/INVENTARIO SRV NAC 2025.xlsx`).
-- **Limpieza Automática:** Normalización de nombres de host, direcciones IP, tipos de servidor y sistemas operativos.
-- **Métricas de Control:**
-  - Distribución Físico vs Virtual.
-  - Compliance de Respaldos.
-  - Análisis de Obsolescencia/Riesgo por SO.
-- **Tecnología:** Python 3.12, Streamlit, Plotly, Pandas, Docker.
+---
 
-## 🚀 Ejecución Rápida (Docker)
+## 📋 Características Principales
 
-1. **Requisitos:** Docker & Docker Compose.
-2. **Setup de Datos:**
-   Asegúrate de que el archivo `INVENTARIO SRV NAC 2025.xlsx` esté en la carpeta `data/`.
-3. **Arrancar:**
+### 📊 Visualización Ejecutiva
 
-   ```bash
-   docker-compose up --build
-   ```
+* **KPIs de Alto Nivel:** Total de servidores, mix físico/virtual, cobertura de backups y capacidad total (RAM/CPU).
+* **Gráficos Interactivos:** Sunburst (Jerarquía), Treemap y Barras Apiladas para análisis profundo.
+* **Filtros Avanzados:** Por Ubicación (UIO/GYE), Segmento de Red, Sistema Operativo y Criticidad.
 
-4. **Acceder:**
-   Abrir [http://localhost:8501](http://localhost:8501).
+### 💰 FinOps & Costos
 
-## 🛠️ Desarrollo Local
+* **Calculadora TCO:** Proyección de costos mensuales/anuales basada en recursos (vCPU/RAM).
+* **Simulación:** Permite ingresar costos unitarios y sobreescribir la capacidad total para escenarios *"What-If"*.
 
-1. **Instalar dependencias (`uv`):**
+### 🔍 Gobierno de Datos
 
-   ```bash
-   pip install uv
-   uv venv
-   uv pip install -r pyproject.toml
-   ```
+* **Auditor Automático:** Detecta servidores sin IP, sin Hostname o con SO desconocido.
+* **Exportación de Errores:** Descarga un Excel limpio con los registros que requieren corrección manual.
 
+### 📄 Reportes Automatizados
+
+* **Generador PDF:** Crea reportes ejecutivos listos para imprimir con un solo clic.
+* **Timezone Aware:** Ajustado automáticamente a la zona horaria de Ecuador (America/Guayaquil).
+
+---
+
+## 🚀 Instalación y Ejecución
+
+### Opción A: Docker (Recomendada)
+
+La forma más rápida y estable de ejecutar el proyecto.
+
+1. **Requisitos:** Docker Desktop instalado.
 2. **Ejecutar:**
 
-   ```bash
-   .venv/Scripts/streamlit run src/app.py
-   ```
+    ```bash
+    docker-compose up --build
+    ```
 
-## 🧪 Tests
+3. **Acceder:** Abrir [http://localhost:8501](http://localhost:8501) en tu navegador.
 
-```bash
-uv run pytest
-```
+### Opción B: Desarrollo Local
+
+Para modificar el código o correr sin contenedores.
+
+1. **Instalar dependencias:**
+
+    ```bash
+    pip install uv
+    uv venv
+    uv pip install -r pyproject.toml
+    ```
+
+2. **Ejecutar aplicación:**
+
+    ```bash
+    .venv/Scripts/streamlit run src/app.py
+    ```
+
+---
 
 ## 📂 Estructura del Proyecto
 
 ```text
 .
-├── data/               # Volumen de persistencia (Excel)
+├── data/               # Fuente de datos (Excel: INVENTARIO SRV.xlsx)
 ├── src/
-│   ├── core/           # Lógica de Negocio (Backend puro)
-│   │   ├── loader.py   # Ingesta
-│   │   ├── cleaner.py  # Limpieza
-│   │   └── metrics.py  # KPIs
-│   ├── ui/             # Capa de Presentación
-│   │   ├── charts.py   # Componentes Visuales
-│   │   └── layout.py   # Composición de Pantalla
-│   └── app.py          # Entrypoint
-├── tests/              # Tests Unitarios
-└── Dockerfile          # Definición de Contenedor
+│   ├── core/           # Lógica de Negocio
+│   │   ├── cleaner.py  # Limpieza y Normalización
+│   │   ├── metrics.py  # Cálculos de KPIs y FinOps
+│   │   ├── reporter.py # Generador de PDF (fpdf2)
+│   │   └── loader.py   # Carga de archivos
+│   ├── ui/             # Interfaz Gráfica
+│   │   ├── charts.py   # Gráficos Plotly Premium
+│   │   └── layout.py   # Estructura del Dashboard
+│   └── app.py          # Punto de entrada
+├── tests/              # Pruebas automatizadas
+└── Dockerfile          # Configuración de despliegue
 ```
 
-## License & Credits
+---
 
-This project is licensed under the MIT License.
+## 🛠️ Tecnologías
 
-Created and maintained by **Ronny Ortiz**.
+* **Core:** Python 3.12, Pandas.
+* **UI:** Streamlit.
+* **Viz:** Plotly Express / Graph Objects.
+* **Reportes:** FPDF2, XlsxWriter.
+* **Infra:** Docker, Docker Compose.
+
+---
+
+## 👤 Créditos
+
+Desarrollado y mantenido por **Ronny Ortiz**.
+*Control de Plataforma Xtrim - 2025*
