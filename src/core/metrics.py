@@ -206,6 +206,77 @@ class MetricasInventario:
         val = self.df['cpu_cores'].sum()
         return int(val) if pd.notna(val) else 0
     
+    # === FUNCIONES AVANZADAS (PRODUCCIÓN) ===
+    
+    def calcular_finops(self, costo_cpu_mensual: float, costo_ram_mensual: float, total_cpu_custom: float = None, total_ram_custom: float = None) -> Dict[str, Any]:
+        """Calcula costos estimados de infraestructura."""
+        
+        # Usar valor custom si existe, sino sumar columnas
+        total_cpu = total_cpu_custom if total_cpu_custom is not None else (self.df['cpu_cores'].sum() if 'cpu_cores' in self.df.columns else 0)
+        total_ram = total_ram_custom if total_ram_custom is not None else (self.df['ram_gb'].sum() if 'ram_gb' in self.df.columns else 0)
+        
+        costo_cpu = total_cpu * costo_cpu_mensual
+        costo_ram = total_ram * costo_ram_mensual
+        total = costo_cpu + costo_ram
+        
+        return {
+            'total_mensual': total,
+            'total_anual': total * 12,
+            'desglose': {
+                'cpu_costo': costo_cpu,
+                'ram_costo': costo_ram,
+                'cpu_unidades': total_cpu,
+                'ram_unidades': total_ram
+            }
+        }
+
+    def auditar_calidad_datos(self) -> pd.DataFrame:
+        """Identifica registros con problemas de calidad de datos."""
+        df_audit = self.df.copy()
+        
+        # Inicializar columnas de issues
+        df_audit['issues_ip'] = None
+        df_audit['issues_host'] = None
+        df_audit['issues_os'] = None
+        
+        # Validar IP
+        if 'ip' in df_audit.columns:
+            mask_ip = df_audit['ip'].isna() | (df_audit['ip'] == '') | (df_audit['ip'] == 'SIN IP')
+            df_audit.loc[mask_ip, 'issues_ip'] = 'Falta IP'
+            
+        # Validar Hostname
+        if 'hostname' in df_audit.columns:
+            mask_host = df_audit['hostname'].isna() | (df_audit['hostname'] == '') | (df_audit['hostname'] == 'SIN HOSTNAME')
+            df_audit.loc[mask_host, 'issues_host'] = 'Falta Hostname'
+            
+        # Validar OS
+        if 'os' in df_audit.columns:
+            mask_os = df_audit['os'].isin(['Otro', 'DESCONOCIDO', 'None', 'OTRO'])
+            df_audit.loc[mask_os, 'issues_os'] = 'OS Desconocido'
+
+        # Consolidar issues
+        issue_cols = ['issues_ip', 'issues_host', 'issues_os']
+        
+        # Unir mensajes de error
+        def unir_issues(row):
+            issues = [str(row[c]) for c in issue_cols if pd.notna(row[c])]
+            return ', '.join(issues)
+            
+        df_audit['hallazgos'] = df_audit.apply(unir_issues, axis=1)
+        
+        # Filtrar solo los que tienen problemas
+        df_dirty = df_audit[df_audit['hallazgos'] != ''].copy()
+        
+        if df_dirty.empty:
+            return pd.DataFrame()
+            
+        # Seleccionar columnas relevantes
+        cols_finales = ['hostname', 'ip', 'os', 'hallazgos']
+        if 'location' in df_audit.columns:
+            cols_finales.append('location')
+            
+        return df_dirty[cols_finales]
+
     # === RESUMEN EJECUTIVO ===
     
     def obtener_resumen(self) -> Dict[str, Any]:

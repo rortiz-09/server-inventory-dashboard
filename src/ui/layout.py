@@ -13,6 +13,8 @@ from typing import Optional
 
 from src.core.metrics import InventoryMetrics
 from src.ui import charts
+import src.core.reporter as reporter
+import io
 
 
 def aplicar_estilos():
@@ -129,6 +131,9 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
     """Renderizado principal."""
     aplicar_estilos()
     
+    # 0. Calculamos resumen inicial para defaults del sidebar
+    resumen_global = metricas.obtener_resumen()
+    
     # Sidebar
     with st.sidebar:
         st.header("⚙️ OPCIONES")
@@ -157,6 +162,43 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
                 bk_sel = st.multiselect("Respaldo", sorted(df['has_backup'].unique()))
             else:
                 bk_sel = []
+
+        st.markdown("---")
+        st.markdown("### 💰 FinOps (Estimación)")
+        costo_cpu = st.number_input("Costo unitario vCPU ($)", min_value=0.0, value=15.0, step=1.0)
+        costo_ram = st.number_input("Costo unitario GB RAM ($)", min_value=0.0, value=8.0, step=1.0)
+        
+        # Override de Capacidad Total
+        use_custom_capacity = st.checkbox("Sobreescribir Capacidad Total", value=False)
+        custom_cpu = None
+        custom_ram = None
+        
+        if use_custom_capacity:
+            default_cpu = resumen_global['total_cpu']
+            default_ram = int(resumen_global['total_ram_gb'])
+            custom_cpu = st.number_input("Total vCPU Cores", min_value=0, value=default_cpu)
+            custom_ram = st.number_input("Total RAM (GB)", min_value=0, value=default_ram)
+            st.caption("Calculando costos sobre estos valores manuales.")
+        
+        st.markdown("---")
+        st.markdown("### 📄 Reportes")
+        if st.sidebar.button("Generar PDF Ejecutivo"):
+             try:
+                # Generar bytes del PDF
+                pdf_bytes = reporter.generar_reporte_pdf(
+                    metricas.obtener_resumen(), 
+                    metricas.top_aplicaciones
+                )
+                
+                st.sidebar.download_button(
+                    label="📥 Descargar PDF",
+                    data=pdf_bytes,
+                    file_name="reporte_ejecutivo.pdf",
+                    mime="application/pdf"
+                )
+                st.sidebar.success("Generado!")
+             except Exception as e:
+                st.sidebar.error(f"Error: {e}")
 
     # Lógica de filtrado
     df_f = df.copy()
@@ -274,7 +316,61 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
         fig = charts.crear_grafico_barras(datos_red, "Distribución Total por Segmento de Red (VLANs)", orientacion='h', color='#8E44AD')
         st.plotly_chart(fig, use_container_width=True)
 
-    # ROW 6: TABLA DETALLADA
+    # ROW 6: FINOPS Y GOBIERNO (NUEVO)
+    st.markdown("---")
+    st.markdown("### 💰 IMPACTO FINANCIERO (ESTIMADO)")
+    
+    finops = m.calcular_finops(costo_cpu, costo_ram, custom_cpu, custom_ram)
+    fc1, fc2, fc3 = st.columns(3)
+    
+    with fc1:
+        st.metric("COSTO MENSUAL (TCO)", f"${finops['total_mensual']:,.2f}")
+    with fc2:
+        st.metric("COSTO ANUAL PROYECTADO", f"${finops['total_anual']:,.2f}")
+    with fc3:
+         costo_cpu_total = finops['desglose']['cpu_costo']
+         costo_ram_total = finops['desglose']['ram_costo']
+         # Pequeño breakdown
+         df_costos = pd.DataFrame({
+             'Recurso': ['CPU', 'RAM'],
+             'Costo': [costo_cpu_total, costo_ram_total]
+         }).set_index('Recurso')
+         st.bar_chart(df_costos, color='#27AE60', height=120)
+
+    # ROW 7: CALIDAD DE DATOS
+    st.markdown("---")
+    st.markdown("### 🔍 CALIDAD DE DATOS & GOBIERNO")
+    
+    calidad_df = m.auditar_calidad_datos()
+    
+    qc1, qc2 = st.columns([1, 2])
+    
+    with qc1:
+        st.metric("SCORE DE CALIDAD", f"{resumen['calidad']:.0f}/100")
+        if not calidad_df.empty:
+            st.error(f"Se encontraron {len(calidad_df)} registros con problemas.")
+            
+            # Boton descargar excel errores
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                calidad_df.to_excel(writer, sheet_name='Errores', index=False)
+                
+            st.download_button(
+                label="📥 Descargar Reporte de Errores (Excel)",
+                data=buffer.getvalue(),
+                file_name="reporte_calidad_datos.xlsx",
+                mime="application/vnd.ms-excel"
+            )
+        else:
+            st.success("¡Excelente! No se encontraron problemas obvios en los datos.")
+            
+    with qc2:
+        if not calidad_df.empty:
+            st.dataframe(calidad_df, height=200, use_container_width=True)
+        else:
+             st.info("La calidad de los datos cumple con los estándares definidos (IP válida, Hostname, SO identificado).")
+
+    # ROW 8: TABLA DETALLADA
     st.markdown("---")
     st.markdown("### 📋 INVENTARIO DETALLADO")
     
