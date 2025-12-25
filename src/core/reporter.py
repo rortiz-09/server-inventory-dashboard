@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 import tempfile
 from typing import Dict, Any
+from zoneinfo import ZoneInfo
 
 class PDFReport(FPDF):
     def __init__(self):
@@ -17,9 +18,10 @@ class PDFReport(FPDF):
     def header(self):
         # Logo placeholder (Texto)
         self.set_font('Arial', 'B', 15)
-        self.cell(0, 10, 'REPORTE EJECUTIVO DE INFRAESTRUCTURA', 0, 1, 'C')
+        self.cell(0, 10, 'REPORTE DE INFRAESTRUCTURA', 0, 1, 'C')
         self.set_font('Arial', 'I', 10)
-        fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Usar zona horaria de Ecuador (Guayaquil/Quito)
+        fecha = datetime.now(ZoneInfo("America/Guayaquil")).strftime("%Y-%m-%d %H:%M")
         self.cell(0, 10, f'Generado por: Ronny Ortiz el {fecha}', 0, 1, 'C')
         self.ln(5)
 
