@@ -27,7 +27,9 @@ COLUMN_MAPPING = {
     
     # Clasificación
     "TIPO DE SERVIDOR": "server_type",
+    "TIPO": "server_type", # Maestro V2
     "SISTEMA OPERATIVO": "os",
+    "OS": "os", # Maestro V2
     "UBICACION": "location",
     "LOCATION": "location",
     "DATA CENTER": "datacenter",
@@ -52,7 +54,15 @@ COLUMN_MAPPING = {
     
     # Riesgo y Compliance
     "SISTEMAS CRITICOS": "criticality",
-    "CRITICIDAD": "criticality",
+    "CRITICIDAD": "criticality", # Added from Maestro
+    "CRITICO": "criticality",
+    
+    # Ubicación
+    "DATA CENTER": "location",
+    "LOCATION": "location",
+    "UBICACION": "location", # Added from Maestro
+    "CIUDAD": "location", # Added from NAC source
+    
     "BACKUP": "has_backup",
     "BACKUP SE REALIZA": "has_backup",
     "TIENE BACKUP": "has_backup",
