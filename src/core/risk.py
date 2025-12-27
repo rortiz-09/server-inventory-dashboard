@@ -29,7 +29,7 @@ class RiskRadar:
                 pass # Cache corrupto o viejo, ignorar
 
         # 2. Fetch API (Solo productos clave para no saturar)
-        products = ['windows-server', 'ubuntu', 'redhat', 'centos', 'debian']
+        products = ['windows-server', 'ubuntu', 'redhat', 'centos', 'debian', 'oracle-linux']
         data = {}
         
         try:
@@ -66,82 +66,77 @@ class RiskRadar:
         if not os_name:
             return {'status': 'UNKNOWN', 'eol_date': None}
 
-        os_lower = str(os_name).lower()
+        # 1. Limpieza base
+        os_clean = str(os_name).lower().replace(',', '.') # Fix "22,04", "8,9"
+        
         product = None
         version = None
+        
+        import re
 
-        # --- HEURÍSTICA MEJORADA ---
+        # --- HEURÍSTICA AVANZADA (Basada en datos reales) ---
         
         # 1. WINDOWS SERVER
-        if 'windows' in os_lower:
+        if 'windows' in os_clean and 'server' in os_clean:
             product = 'windows-server'
-            # Extraer año (2008, 2012, 2016, 2019, 2022)
-            # Orden inverso para evitar matches parciales si los hubiera
-            for v in ['2025', '2022', '2019', '2016', '2012', '2008', '2003', '2000']:
-                if v in os_lower:
-                    version = v
-                    # Caso especial: R2 (endoflife.date a veces distingue, a veces no. Para win serv, ciclo es "2012", no "2012 R2")
-                    break
+            # Patterns: "server 2016", "server 2022", "server 2008"
+            match = re.search(r'server\s+(\d{4})', os_clean)
+            if match:
+                version = match.group(1)
         
         # 2. UBUNTU
-        elif 'ubuntu' in os_lower:
+        elif 'ubuntu' in os_clean:
             product = 'ubuntu'
-            import re
-            # Busca XX.04 o XX.10
-            match = re.search(r'(\d{2}\.\d{2})', os_lower)
+            # Patterns: "ubuntu 22.04", "ubuntu 22.04 lts", "ubuntu 20.04"
+            match = re.search(r'(\d{2}\.\d{2})', os_clean)
             if match:
                 version = match.group(1)
-        
-        # 3. RHEL / RED HAT
-        elif 'red hat' in os_lower or 'rhel' in os_lower:
+
+        # 3. RED HAT / RHEL
+        elif 'red hat' in os_clean or 'rhel' in os_clean:
             product = 'redhat'
-            import re
-            # Busca numero entero principal: "Release 7", "RHEL 8.4" -> ciclo es "7", "8"
-            match = re.search(r'(?:release|rhel)\s*(\d+)', os_lower)
-            if not match: 
-                 # Intento fallback simple: buscar digito suelto si dice "enterprise linux"
-                 match = re.search(r'linux\s*(\d+)', os_lower)
-            
+            # Patterns: "release 7.9", "release 6.10", "rhel 8.4", "linux 8.6"
+            # Prioridad: Buscar version mayor (7, 8, 9)
+            match = re.search(r'(?:release|rhel|linux)\s*?(\d{1,2})', os_clean)
             if match:
                 version = match.group(1)
         
-        # 4. CENTOS
-        elif 'centos' in os_lower:
+        # 4. ORACLE LINUX
+        elif 'oracle linux' in os_clean:
+             product = 'oracle-linux'
+             # Patterns: "oracle linux 7.9", "oracle linux 7.6"
+             match = re.search(r'linux\s*(\d{1,2})', os_clean)
+             if match:
+                 version = match.group(1)
+
+        # 5. CENTOS
+        elif 'centos' in os_clean:
             product = 'centos'
-            import re
-            # CentOS 7, CentOS 8
-            match = re.search(r'centos\s*(?:linux\s*)?(\d+)', os_lower)
+            # Patterns: "centos 7", "release 7.9", "release 5.9"
+            match = re.search(r'(?:centos|release)\s*(\d{1})', os_clean)
             if match:
                 version = match.group(1)
                 
-        # 5. DEBIAN
-        elif 'debian' in os_lower:
+        # 6. DEBIAN
+        elif 'debian' in os_clean:
             product = 'debian'
-            import re
-            # Debian 10, 11
-            match = re.search(r'debian\s*(?:linux\s*)?(\d+)', os_lower)
+            # Patterns: "debian 12", "debian gnu/linux 12"
+            match = re.search(r'debian\s*(?:gnu/linux\s*)?(\d+)', os_clean)
             if match:
                 version = match.group(1)
 
         # --- EVALUACIÓN ---
         if product and version and product in self.lifecycle_data:
-            # Normalizar version a string
             version = str(version)
-            
-            # Caso especial RHEL/CentOS: API usa "7", "8" etc.
-            
             eol_str = self.lifecycle_data[product].get(version)
             
             if eol_str:
-                if isinstance(eol_str, bool): # False = no eol yet? or boolean support flag
-                     # En endoflife.date, 'eol' puede ser booleano false si aun está vivo sin fecha? No, suele ser fecha o bool.
-                     # Si es False, significa que no ha muerto.
+                if isinstance(eol_str, bool): 
                      if eol_str is False:
                          return {'status': 'OK', 'eol_date': 'Supported'}
                      return {'status': 'EOL', 'eol_date': 'Expired'}
                 
                 try:
-                    # eol_str date format YYYY-MM-DD
                     eol_date = date.fromisoformat(str(eol_str))
                     today = date.today()
                     days_to_eol = (eol_date - today).days
@@ -153,7 +148,6 @@ class RiskRadar:
                     else:
                         return {'status': 'OK', 'eol_date': eol_str}
                 except ValueError:
-                     # Si no es fecha ISO, asumimos texto informativo
-                     pass
+                    pass
 
         return {'status': 'UNKNOWN', 'eol_date': None}
