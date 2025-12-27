@@ -83,19 +83,19 @@ def crear_sunburst(df: pd.DataFrame, ruta: List[str], titulo: str) -> go.Figure:
     
     return fig
 
-def crear_treemap(df: pd.DataFrame, ruta: List[str], titulo: str) -> go.Figure:
+def crear_treemap(df: pd.DataFrame, path: List[str], titulo: str) -> go.Figure:
     """Crea TreeMap estructurado y claro."""
     if df.empty:
         return go.Figure()
         
     df_chart = df.copy()
-    for col in ruta:
+    for col in path:
         df_chart[col] = df_chart[col].fillna('?')
 
     fig = px.treemap(
         df_chart,
-        path=ruta,
-        color=ruta[1] if len(ruta) > 1 else ruta[0],
+        path=path,
+        color=path[1] if len(path) > 1 else path[0],
         color_discrete_sequence=COLORS['primary']
     )
     

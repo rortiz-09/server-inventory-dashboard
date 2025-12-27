@@ -407,6 +407,62 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
          }).set_index('Recurso')
          st.bar_chart(df_costos, color='#27AE60', height=120)
 
+    # === NUEVAS SECCIONES PREMIUM (Negocio e Infra) ===
+    
+    # SECCIÓN DE NEGOCIO (Responsables y Apps)
+    if 'RESPONSABLE' in df_f.columns and 'APLICACION' in df_f.columns:
+        st.markdown("---")
+        st.markdown("### 🏢 GESTIÓN DE NEGOCIO (Dueños de Servicio)")
+        
+        col_biz1, col_biz2 = st.columns([2, 1])
+        with col_biz1:
+            # Treemap Responsable -> Aplicación
+            # Limpieza rápida para el gráfico
+            df_biz = df_f.copy()
+            df_biz['RESPONSABLE'] = df_biz['RESPONSABLE'].fillna('SIN ASIGNAR').astype(str)
+            df_biz['APLICACION'] = df_biz['APLICACION'].fillna('GENERICO').astype(str)
+            
+            fig = charts.crear_treemap(
+                df_biz, 
+                path=['RESPONSABLE', 'APLICACION'], 
+                titulo="Mapa de Responsabilidad: ¿Quién cuida qué?"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col_biz2:
+            st.info("Top 5 Responsables por Carga (CPU)")
+            if 'cpu_cores' in df_biz.columns:
+                top_resp = df_biz.groupby('RESPONSABLE')['cpu_cores'].sum().sort_values(ascending=False).head(5)
+                st.bar_chart(top_resp, color="#E67E22")
+            else:
+                st.caption("No hay datos de CPU para calcular carga.")
+
+    # SECCIÓN DE INFRAESTRUCTURA FÍSICA (Hardware)
+    # Detectar si hay datos físicos reales (Enclosure, Serial, Modelo)
+    cols_fisicos = [c for c in df_f.columns if c in ['ENCLOSURE', 'MODELO', 'SERIAL', 'IP_ADMIN']]
+    hay_fisicos = len(cols_fisicos) > 0 and df_f['server_type'].str.contains('FISICO').any()
+    
+    if hay_fisicos:
+        st.markdown("---")
+        st.markdown("### 🏗️ INFRAESTRUCTURA FÍSICA & HARDWARE")
+        
+        ic1, ic2 = st.columns(2)
+        with ic1:
+            st.metric("Total Hosts Físicos", df_f[df_f['server_type'] == 'FISICO'].shape[0])
+            if 'MODELO' in df_f.columns:
+                top_models = df_f['MODELO'].value_counts().head(5)
+                st.write("**Modelos Predominantes:**")
+                st.dataframe(top_models, use_container_width=True)
+                
+        with ic2:
+            if 'ENCLOSURE' in df_f.columns:
+                 # Gráfico de Enclosures (Donde están alojados)
+                 enc_counts = df_f['ENCLOSURE'].value_counts()
+                 fig = charts.crear_grafico_pastel(enc_counts.to_dict(), "Distribución por Enclosure / Chasis")
+                 st.plotly_chart(fig, use_container_width=True)
+            else:
+                 st.info("No se detectó información de Enclosures.")
+
     # ROW 7: CALIDAD DE DATOS
     st.markdown("---")
     st.markdown("### 🔍 CALIDAD DE DATOS & GOBIERNO")
