@@ -87,15 +87,46 @@ def normalizar_sistema_operativo(valor: Any) -> str:
         'Windows', 'Linux', 'ESXi' u 'Otro'
     """
     if pd.isna(valor):
-        return "Otro"
+        return "Desconocido"
     
-    valor_str = str(valor).upper().strip()
+    # Limpieza básica
+    valor_str = str(valor).strip()
     
-    for clave, normalizado in OS_MAPPING.items():
-        if clave in valor_str:
-            return normalizado
+    # 1. Correcciones de Typos comunes
+    correcciones = {
+        'WINdows': 'Windows',
+        'REd Hat': 'Red Hat',
+        'CENTOS': 'CentOS',
+        'Ubuntu': 'Ubuntu',
+        'Debian': 'Debian',
+        'Oracle': 'Oracle',
+        'VMWARE': 'VMware'
+    }
     
-    return "Otro"
+    # Aplicar correcciones (case insensitive replace si es necesario, o simple replace)
+    # Para ser robusto, usamos Title Case general, pero preservamos ciertas siglas si hiciese falta
+    # En este caso, un simple capitalize/title suele funcionar, pero mejor manual para "Server" etc.
+    
+    # Normalizar a Title Case general (Windows Server 2016)
+    import string
+    valor_clean = string.capwords(valor_str)
+    
+    # Reemplazos específicos Post-Title
+    valor_clean = valor_clean.replace('Redhat', 'Red Hat')
+    valor_clean = valor_clean.replace('Win ', 'Windows ') # A veces viene "Win 2016"
+    valor_clean = valor_clean.replace('Centos', 'CentOS')
+    valor_clean = valor_clean.replace('Vmware', 'VMware')
+    
+    # Eliminar sufijos ruidosos
+    sufijos_ruido = ['(64-bit)', '(32-bit)', '- OTR', 'OTR', 'LTS', 'Evaluacion']
+    for sufijo in sufijos_ruido:
+        valor_clean = valor_clean.replace(sufijo, '').strip()
+        valor_clean = valor_clean.replace(sufijo.upper(), '').strip()
+        
+    # Eliminar comas raras (22,04 -> 22.04)
+    valor_clean = valor_clean.replace(',', '.')
+    
+    return valor_clean
 
 
 
@@ -202,10 +233,7 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
     # Paso 3: Normalizar tipo de servidor
     df['server_type'] = df['server_type'].apply(normalizar_tipo_servidor)
     
-    # Paso 3.1: Preservar detalle crudo del SO para Risk Radar
-    df['os_detail'] = df['os'].copy()
-
-    # Paso 4: Normalizar sistema operativo (Categoría General)
+    # Paso 4: Normalizar sistema operativo (Detallado pero limpio)
     df['os'] = df['os'].apply(normalizar_sistema_operativo)
     
     # Paso 5: Limpiar campos de texto

@@ -299,13 +299,12 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
     df_risk = df_f.copy()
     
     # Aplicar evaluación a cada fila única de SO para eficiencia
-    col_os_analisis = 'os_detail' if 'os_detail' in df_risk.columns else 'os'
-    unique_os = df_risk[col_os_analisis].dropna().unique()
+    unique_os = df_risk['os'].dropna().unique()
     risk_map = {os: radar.evaluate_os(os) for os in unique_os}
     
     # KPIs de Riesgo
-    eol_count = sum(1 for os in df_risk[col_os_analisis] if risk_map.get(os, {}).get('status') == 'EOL')
-    risk_count = sum(1 for os in df_risk[col_os_analisis] if risk_map.get(os, {}).get('status') == 'RISK')
+    eol_count = sum(1 for os in df_risk['os'] if risk_map.get(os, {}).get('status') == 'EOL')
+    risk_count = sum(1 for os in df_risk['os'] if risk_map.get(os, {}).get('status') == 'RISK')
     
     r1, r2, r3 = st.columns(3)
     with r1:
@@ -318,8 +317,8 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
     if eol_count > 0:
         st.warning(f"⚠️ Se detectaron {eol_count} servidores con sistemas operativos fuera de soporte.")
         # Mostrar tabla de afectados usando la columna detallada para el mapa
-        affected = df_risk[df_risk[col_os_analisis].map(lambda x: risk_map.get(x, {}).get('status') == 'EOL')]
-        st.dataframe(affected[['hostname', 'ip', col_os_analisis, 'server_type']], height=150)
+        affected = df_risk[df_risk['os'].map(lambda x: risk_map.get(x, {}).get('status') == 'EOL')]
+        st.dataframe(affected[['hostname', 'ip', 'os', 'server_type']], height=150)
         
     st.markdown("---")
         
