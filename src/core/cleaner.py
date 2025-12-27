@@ -290,6 +290,23 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
         
         # Extraer segmento /24 para análisis técnico también
         df['ip_segment'] = df['ip'].apply(extraer_segmento_ip)
+        
+    # Paso 8.1: Limpieza de Hardware (RAM/CPU)
+    def clean_number(val):
+        if pd.isna(val): return 0
+        s = str(val).upper()
+        # Extraer primer número encontrado
+        import re
+        match = re.search(r'(\d+)', s)
+        if match:
+            return int(match.group(1))
+        return 0
+
+    if 'ram_gb' in df.columns:
+        df['ram_gb'] = df['ram_gb'].apply(clean_number)
+        
+    if 'cpu_cores' in df.columns:
+        df['cpu_cores'] = df['cpu_cores'].apply(clean_number)
     
     # Paso 9: Limpiar hostname (convertir None a string legible)
     

@@ -36,14 +36,19 @@ COLUMN_MAPPING = {
     "RAM": "ram_gb",
     "RAM (GB)": "ram_gb",
     "MEMORIA RAM": "ram_gb",
+    "MEMORIA": "ram_gb", # Added
     "CPU": "cpu_cores",
     "CPU CORES": "cpu_cores",
+    "PROCESADOR": "cpu_cores", # Added
     
     # Operación
     "SERVIDOR PRODUCCIÓN / PREPRODUCCIÓN": "environment",
     "AMBIENTE": "environment",
+    "PRODUCCION": "environment", # Added
     "APLICACIÓN": "application",
     "APLICACION": "application",
+    "BASE DE DATOS": "database_engine", # Added
+    "VERSION DB": "database_version", # Added
     
     # Riesgo y Compliance
     "SISTEMAS CRITICOS": "criticality",
