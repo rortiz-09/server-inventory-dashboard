@@ -14,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 # Archivo principal: INVENTARIO SRV.xlsx (274 registros oficiales)
-EXCEL_FILE = DATA_DIR / "INVENTARIO SRV.xlsx"
+EXCEL_FILE = DATA_DIR / "MAESTRO_PLATAFORMA_V2.xlsx"
 
 
 # === MAPEO DE COLUMNAS ===

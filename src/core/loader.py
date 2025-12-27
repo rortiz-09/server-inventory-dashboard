@@ -28,9 +28,16 @@ def load_data(file_source: Union[str, BinaryIO]) -> pd.DataFrame:
         xl = pd.ExcelFile(file_source)
         all_dfs = []
         
-        target_sheets = [s for s in xl.sheet_names if "2025" in s]
-        if not target_sheets:
-            target_sheets = xl.sheet_names
+        # ESTRATEGIA DE SELECCIÓN DE HOJAS
+        # 1. Si existe la hoja estandar "SERVIDORES", úsala.
+        if "SERVIDORES" in xl.sheet_names:
+            target_sheets = ["SERVIDORES"]
+        else:
+            # 2. Fallback: Buscar hojas con "2025" (Legacy)
+            target_sheets = [s for s in xl.sheet_names if "2025" in s]
+            if not target_sheets:
+                # 3. Fallback Total: Leer todo
+                target_sheets = xl.sheet_names
 
         print(f"Loading sheets: {target_sheets}")
 
