@@ -202,7 +202,10 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
     # Paso 3: Normalizar tipo de servidor
     df['server_type'] = df['server_type'].apply(normalizar_tipo_servidor)
     
-    # Paso 4: Normalizar sistema operativo
+    # Paso 3.1: Preservar detalle crudo del SO para Risk Radar
+    df['os_detail'] = df['os'].copy()
+
+    # Paso 4: Normalizar sistema operativo (Categoría General)
     df['os'] = df['os'].apply(normalizar_sistema_operativo)
     
     # Paso 5: Limpiar campos de texto
