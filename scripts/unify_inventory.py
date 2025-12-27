@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 
 SOURCE_FILE = Path("data/INVENTARIO SRV NAC 2025.xlsx")
-OUTPUT_FILE = Path("data/MAESTRO_PLATAFORMA_V1.xlsx")
+OUTPUT_FILE = Path("data/MAESTRO_PLATAFORMA_V2.xlsx")
 
 def clean_header(txt):
     return str(txt).strip().upper().replace('\n', ' ').replace('  ', ' ')
@@ -42,96 +42,113 @@ def main():
 
     # --- 2. Selección y Renombrado de Columnas ---
     
-    # Mapeo de columnas originales -> Estandar
+    # --- 1.5 Pre-procesamiento de Columnas (Coalesce) ---
+    # El archivo origen separa SRV FISICOS y SRV VIRTUALES
+    # Debemos unificarlos en HOSTNAME
+    
+    # Normalizar nombres de columnas que pueden variar
+    col_fisico = next((c for c in df.columns if 'SRV FISICOS' in c and 'TOTAL' not in c), None)
+    col_virtual = next((c for c in df.columns if 'SRV VIRTUALES' in c and '#' not in c), None)
+    
+    # Crear columna HOSTNAME combinada
+    if col_fisico and col_virtual:
+        # Prioridad: Si hay físico usa ese, sino virtual.
+        # Pero ojo, pueden ser mutuamente excluyentes
+        df['HOSTNAME'] = df[col_fisico].fillna(df[col_virtual])
+    elif col_fisico:
+        df['HOSTNAME'] = df[col_fisico]
+    elif col_virtual:
+        df['HOSTNAME'] = df[col_virtual]
+    else:
+        # Fallback si ya existe una columna HOSTNAME
+        if 'HOSTNAME' not in df.columns:
+            df['HOSTNAME'] = "SRV-DESCONOCIDO"
+
+    # --- 2. Selección y Renombrado de Columnas ---
+    
+    # Mapeo de columnas originales -> Estandar (User Defined)
     mapping = {
-        'HOSTNAME': 'HOSTNAME', # A veces no tiene nombre explicito, buscaré heurística
+        'HOSTNAME': 'HOSTNAME',
         'IP INTERNA': 'IP_ADDRESS',
         'TIPO DE SERVIDOR': 'TIPO',
         'SISTEMA OPERATIVO': 'OS',
         'APLICACIÓN': 'APLICACION',
-        'APLICACIN': 'APLICACION', # Encoding fix
-        'MEMORIA': 'RAM_RAW',
-        'PROCESADOR': 'CPU_RAW',
-        'PROTECCIÓN DE TREND MCRO XDR - SRV': 'SEG_TREND',
-        'PROTECCIN DE TREND MCRO XDR - SRV': 'SEG_TREND',
-        'CORTEX': 'SEG_CORTEX',
-        'BASE DE DATOS': 'DB_ENGINE',
-        'VERSIÓN DB': 'DB_VERSION',
-        'VERSIN DB': 'DB_VERSION',
-        'EMPRESA QUE DA SOPORTE': 'SOPORTE_VENDOR',
-        'COSTO SOPORTE': 'SOPORTE_COSTO',
-        'CIUDAD': 'UBICACION',
-        'AMBIENTE': 'AMBIENTE',
+        'APLICACIN': 'APLICACION',
+        'MEMORIA': 'RAM_GB',
+        'PROCESADOR': 'CPU',
+        'PERSONA RESPONSABLE DEL USO DEL SRV': 'RESPONSABLE',
+        'RESPONSABLE': 'RESPONSABLE',
+        'ENCLOSURE': 'ENCLOSURE',
+        'IP DEL BLADE': 'IP_ADMIN',
+
         'SERIE': 'SERIAL',
-        'BACKUP SE REALIZA': 'TIENE_BACKUP'
+        'CARACTERISTICAS': 'MODELO',
+        'CIUDAD': 'UBICACION',
+        'SERVIDOR PRODUCCIN / PREPRODUCCIN': 'AMBIENTE',
+        'SERVIDOR PRODUCCION / PREPRODUCCION': 'AMBIENTE',
+        'SERVIDOR PRODUCCIÓN / PREPRODUCCIÓN': 'AMBIENTE',
+        'AMBIENTE': 'AMBIENTE',
+        'SISTEMAS CRITICOS': 'CRITICIDAD'
     }
     
     # Filtrar columnas que existen
     rename_dict = {}
     for col in df.columns:
-        # Intento de match exacto o parcial seguro
         for key, val in mapping.items():
-            if key in col: # Cuidado con matches parciales, pero estos keys son bastante únicos
+            if key == col: 
                 rename_dict[col] = val
                 break
     
     df_clean = df.rename(columns=rename_dict)
     
-    # Si no hay HOSTNAME explícito, intentamos 'NOMBRE' o asumimos que falta
-    if 'HOSTNAME' not in df_clean.columns:
-        # A veces es Unnamed o Nombre de servidor
-        # En el análisis anterior vi que NO había columna HOSTNAME explicita en head(5)?
-        # Chequeo manual rápido: TIPO, SRV VIRTUALES...
-        pass
-
+    # Limpieza de valores (RAM/CPU vacíos)
+    if 'RAM_GB' not in df_clean.columns: df_clean['RAM_GB'] = None
+    if 'CPU' not in df_clean.columns: df_clean['CPU'] = None
+    
     # --- 3. Generación de Splits ---
     
-    # A. GENERAL (Lo esencial)
-    cols_general = ['UBICACION', 'HOSTNAME', 'IP_ADDRESS', 'TIPO', 'OS', 'AMBIENTE', 'SERIAL', 'RAM_RAW', 'CPU_RAW', 'APLICACION']
-    # Select only existing
-    cols_general = [c for c in cols_general if c in df_clean.columns]
-    df_general = df_clean[cols_general].copy()
+    # A. SERVIDORES (Hoja Principal)
+    # Debe contener todo lo necesario para el dashboard
+    cols_main = ['HOSTNAME', 'IP_ADDRESS', 'TIPO', 'OS', 'RAM_GB', 'CPU', 'UBICACION', 'AMBIENTE', 'APLICACION', 'RESPONSABLE', 'CRITICIDAD']
+    cols_main = [c for c in cols_main if c in df_clean.columns]
+    df_servidores = df_clean[cols_main].copy()
     
-    # B. SEGURIDAD (Cybersec View)
-    cols_sec = ['HOSTNAME', 'IP_ADDRESS', 'OS', 'SEG_TREND', 'SEG_CORTEX', 'TIENE_BACKUP']
-    cols_sec = [c for c in cols_sec if c in df_clean.columns]
-    df_sec = df_clean[cols_sec].copy()
-    
-    # C. BASES DE DATOS (DBA View)
-    # Filtrar solo los que tienen DB
-    cols_db = ['HOSTNAME', 'IP_ADDRESS', 'DB_ENGINE', 'DB_VERSION']
-    cols_db = [c for c in cols_db if c in df_clean.columns]
-    if 'DB_ENGINE' in df_clean.columns:
-        df_db = df_clean.dropna(subset=['DB_ENGINE'])[cols_db]
-        # Filtrar "NO APLICA", "-", etc.
-        df_db = df_db[~df_db['DB_ENGINE'].astype(str).isin(['nan', '-', 'NO', 'N/A'])]
-    else:
-        df_db = pd.DataFrame()
+    # B. APLICATIVOS (Vista de Negocio / Responsabilidad)
+    # Agrupado por Aplicación y Responsable
+    cols_app = ['APLICACION', 'RESPONSABLE', 'HOSTNAME', 'IP_ADDRESS', 'OS', 'RAM_GB', 'CPU']
+    cols_app = [c for c in cols_app if c in df_clean.columns]
+    df_aplicativos = df_clean.dropna(subset=['APLICACION'])[cols_app].sort_values(['APLICACION', 'RESPONSABLE'])
 
-    # D. FINANCIERO / SOPORTE (FinOps View)
-    cols_fin = ['HOSTNAME', 'IP_ADDRESS', 'SERIAL', 'SOPORTE_VENDOR', 'SOPORTE_COSTO']
-    cols_fin = [c for c in cols_fin if c in df_clean.columns]
-    df_fin = df_clean.dropna(subset=['SOPORTE_VENDOR'])[cols_fin]
+    # C. INFRA_FISICA (Hardware / Simplivity)
+    # Filtrar solo físicos o columnas de hardware llenas
+    cols_infra = ['HOSTNAME', 'IP_ADDRESS', 'ENCLOSURE', 'IP_ADMIN', 'SERIAL', 'MODELO', 'UBICACION']
+    cols_infra = [c for c in cols_infra if c in df_clean.columns]
+    
+    # Criterio: Es Fisico O tiene Enclosure O tiene Serial
+    mask_infra = (
+        (df_clean['TIPO'].str.contains('FISICO', na=False, case=False)) | 
+        (df_clean.get('ENCLOSURE', pd.Series([None]*len(df_clean))).notna()) |
+        (df_clean.get('SERIAL', pd.Series([None]*len(df_clean))).notna())
+    )
+    df_infra = df_clean[mask_infra][cols_infra]
     
     # --- 4. Exportar Excel Maestro ---
     print(f"Generando {OUTPUT_FILE}...")
     with pd.ExcelWriter(OUTPUT_FILE, engine='xlsxwriter') as writer:
-        df_general.to_excel(writer, sheet_name='1. GENERAL', index=False)
-        df_sec.to_excel(writer, sheet_name='2. SEGURIDAD', index=False)
-        df_db.to_excel(writer, sheet_name='3. BASES DE DATOS', index=False)
-        df_fin.to_excel(writer, sheet_name='4. SOPORTE Y COSTOS', index=False)
+        df_servidores.to_excel(writer, sheet_name='SERVIDORES', index=False)
+        df_aplicativos.to_excel(writer, sheet_name='APLICATIVOS', index=False)
+        df_infra.to_excel(writer, sheet_name='INFRA_FISICA', index=False)
         
-        # Formato Tabla (Auto-filter)
-        workbook = writer.book
-        for sheet_name, dframe in {'1. GENERAL': df_general, '2. SEGURIDAD': df_sec, '3. BASES DE DATOS': df_db, '4. SOPORTE Y COSTOS': df_fin}.items():
+        # Formato Tabla
+        for sheet_name, dframe in {'SERVIDORES': df_servidores, 'APLICATIVOS': df_aplicativos, 'INFRA_FISICA': df_infra}.items():
             worksheet = writer.sheets[sheet_name]
             (max_row, max_col) = dframe.shape
             options = {'columns': [{'header': col} for col in dframe.columns]}
             if max_row > 0:
                 worksheet.add_table(0, 0, max_row, max_col - 1, options)
-                worksheet.set_column(0, max_col - 1, 20) # Width auto-ish
-
-    print("¡Proceso completado con éxito!")
+                worksheet.set_column(0, max_col - 1, 20)
+                
+    print("¡Estandarización completada!")
 
 if __name__ == "__main__":
     main()

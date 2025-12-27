@@ -22,6 +22,7 @@ EXCEL_FILE = DATA_DIR / "MAESTRO_PLATAFORMA_V2.xlsx"
 COLUMN_MAPPING = {
     # Identificación
     "IP INTERNA": "ip",
+    "IP_ADDRESS": "ip", # Maestro V2
     "IP PUBLICA": "public_ip",
     "HOSTNAME": "hostname",
     

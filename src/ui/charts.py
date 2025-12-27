@@ -139,20 +139,26 @@ def crear_grafico_barras_apiladas(df: pd.DataFrame, x_col: str, y_col: str, colo
     return aplicar_tema(fig)
 
 
+def truncate(text: str, limit: int = 25) -> str:
+    """Acorta textos largos para gráficos."""
+    s = str(text)
+    return s[:limit] + "..." if len(s) > limit else s
+
 def crear_grafico_pastel(datos: Dict[str, int], titulo: str) -> go.Figure:
     """Crea gráfico de pastel (Donut) moderno con etiquetas claras."""
     if not datos:
         return go.Figure()
         
-    labels = list(datos.keys())
+    # Truncar etiquetas largas para visualización limpia
+    labels = [truncate(k) for k in datos.keys()]
     values = list(datos.values())
     
     fig = go.Figure(data=[go.Pie(
         labels=labels,
         values=values,
         hole=.4,
-        textinfo='label+percent+value', # Muestra TODO: Etiqueta, %, Valor
-        textposition='outside',         # Textos afuera para evitar cortes internos
+        textinfo='label+percent', # Quitamos 'value' para ahorrar espacio si es denso
+        textposition='outside',
         marker=dict(colors=COLORS['primary'], line=dict(color='#FFFFFF', width=2))
     )])
     
