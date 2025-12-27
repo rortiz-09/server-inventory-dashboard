@@ -15,6 +15,7 @@ from src.core.metrics import InventoryMetrics
 from src.ui import charts
 import src.core.reporter as reporter
 from src.core.comparator import InventoryComparator
+from src.core.risk import RiskRadar
 import io
 
 
@@ -289,6 +290,37 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
     with col2:
         fig = charts.crear_grafico_pastel(m.distribucion_so, "Distribución Sistemas Operativos")
         st.plotly_chart(fig, use_container_width=True)
+       
+    # ☢️ RISK RADAR (NUEVO)
+    st.markdown("### ☢️ RADAR DE OBSOLESCENCIA (Live EOL)")
+    
+    # Análisis bajo demanda para no bloquear carga inicial si API falla
+    radar = RiskRadar()
+    df_risk = df_f.copy()
+    
+    # Aplicar evaluación a cada fila única de SO para eficiencia
+    unique_os = df_risk['os'].dropna().unique()
+    risk_map = {os: radar.evaluate_os(os) for os in unique_os}
+    
+    # KPIs de Riesgo
+    eol_count = sum(1 for os in df_risk['os'] if risk_map.get(os, {}).get('status') == 'EOL')
+    risk_count = sum(1 for os in df_risk['os'] if risk_map.get(os, {}).get('status') == 'RISK')
+    
+    r1, r2, r3 = st.columns(3)
+    with r1:
+        st.metric("Sistemas EOL (Crítico)", f"{eol_count}", delta="-Riesgo Alto", delta_color="inverse")
+    with r2:
+        st.metric("Próximo a Vencer (<1 año)", f"{risk_count}", delta="Atención", delta_color="off")
+    with r3:
+        st.info("Datos obtenidos en tiempo real de **endoflife.date**.")
+        
+    if eol_count > 0:
+        st.warning(f"⚠️ Se detectaron {eol_count} servidores con sistemas operativos fuera de soporte.")
+        # Mostrar tabla de afectados
+        affected = df_risk[df_risk['os'].map(lambda x: risk_map.get(x, {}).get('status') == 'EOL')]
+        st.dataframe(affected[['hostname', 'ip', 'os', 'server_type']], height=150)
+        
+    st.markdown("---")
         
     # ROW 3: DETALLE GEOGRÁFICO Y AMBIENTES
     col3, col4 = st.columns(2)
