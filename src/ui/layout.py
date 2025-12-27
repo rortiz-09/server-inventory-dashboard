@@ -14,6 +14,7 @@ from typing import Optional
 from src.core.metrics import InventoryMetrics
 from src.ui import charts
 import src.core.reporter as reporter
+from src.core.comparator import InventoryComparator
 import io
 
 
@@ -221,6 +222,43 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
 
     # === DASHBOARD ===
     renderizar_header()
+    
+    # 🕒 TIME MACHINE: COMPARATIVA HISTÓRICA
+    if metricas_anteriores:
+        st.markdown("### 🕒 TIME MACHINE (Comparativa)")
+        comp = InventoryComparator(metricas, metricas_anteriores)
+        cambios = comp.calculate_changes()
+        
+        # Delta Metrics Row
+        dc1, dc2, dc3, dc4 = st.columns(4)
+        with dc1:
+            st.metric("Variación Total", 
+                     f"{cambios['summary']['net_change']:+d}", 
+                     delta=int(cambios['summary']['net_change']))
+        with dc2:
+            st.metric("Nuevas Altas", f"+{cambios['summary']['added_count']}", delta_color="normal")
+        with dc3:
+            st.metric("Bajas/Decomisos", f"-{cambios['summary']['removed_count']}", delta_color="inverse")
+        with dc4:
+            st.metric("Backup Delta", f"{cambios['kpi_deltas']['backup_coverage']:+.0f}%")
+            
+        # Delta Details (Expandable)
+        with st.expander("📝 Ver Detalles de Altas y Bajas"):
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                st.write("**🔽 Bajas (No detectados en carga actual):**")
+                if cambios['details']['removed_hosts']:
+                    st.error(", ".join(cambios['details']['removed_hosts'][:50]))
+                else:
+                    st.caption("Sin bajas detectadas.")
+            with d_col2:
+                st.write("**🔼 Altas (Nuevos en esta carga):**")
+                if cambios['details']['added_hosts']:
+                    st.success(", ".join(cambios['details']['added_hosts'][:50]))
+                else:
+                    st.caption("Sin nuevas altas.")
+        st.markdown("---")
+
     renderizar_kpis_ejecutivos(m, resumen)
     
     st.markdown("---")
