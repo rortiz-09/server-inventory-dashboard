@@ -261,6 +261,11 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
         df['ip_segment'] = df['ip'].apply(extraer_segmento_ip)
     
     # Paso 9: Limpiar hostname (convertir None a string legible)
+    
+    # Conversión explícita de tipos para evitar errores de Arrow
+    if 'ip' in df.columns:
+        df['ip'] = df['ip'].astype(str)
+        
     return df
 
 

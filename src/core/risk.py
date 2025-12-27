@@ -29,23 +29,29 @@ class RiskRadar:
                 pass # Cache corrupto o viejo, ignorar
 
         # 2. Fetch API (Solo productos clave para no saturar)
-        products = ['windows-server', 'ubuntu', 'redhat']
+        products = ['windows-server', 'ubuntu', 'redhat', 'centos', 'debian']
         data = {}
         
         try:
             for product in products:
-                resp = requests.get(f"{API_URL}/{product}.json")
-                if resp.status_code == 200:
-                    cycles = resp.json()
-                    # Mapear ciclo -> fecha EOL
-                    data[product] = {
-                        c['cycle']: c['eol'] for c in cycles
-                    }
-            
-            # Guardar en Cache
-            CACHE_FILE.parent.mkdir(exist_ok=True)
-            with open(CACHE_FILE, 'w') as f:
-                json.dump({'timestamp': date.today().isoformat(), 'data': data}, f)
+                try:
+                    resp = requests.get(f"{API_URL}/{product}.json", timeout=5)
+                    if resp.status_code == 200:
+                        cycles = resp.json()
+                        # Mapear ciclo -> fecha EOL
+                        data[product] = {
+                            str(c['cycle']): c['eol'] for c in cycles
+                        }
+                    else:
+                        print(f"Error HTTP {resp.status_code} para {product}")
+                except Exception as req_err:
+                     print(f"Error conectando para {product}: {req_err}")
+
+            # Guardar en Cache si obtuvimos algo
+            if data:
+                CACHE_FILE.parent.mkdir(exist_ok=True)
+                with open(CACHE_FILE, 'w') as f:
+                    json.dump({'timestamp': date.today().isoformat(), 'data': data}, f)
                 
         except Exception as e:
             print(f"Error fetching EOL data: {e}")
@@ -57,42 +63,86 @@ class RiskRadar:
         Evalúa el riesgo de un SO basado en su nombre.
         Retorna: { 'status': 'EOL'|'RISK'|'OK'|'UNKNOWN', 'eol_date': 'YYYY-MM-DD' }
         """
+        if not os_name:
+            return {'status': 'UNKNOWN', 'eol_date': None}
+
         os_lower = str(os_name).lower()
         product = None
         version = None
 
-        # Heurística simple de detección
+        # --- HEURÍSTICA MEJORADA ---
+        
+        # 1. WINDOWS SERVER
         if 'windows' in os_lower:
             product = 'windows-server'
             # Extraer año (2008, 2012, 2016, 2019, 2022)
-            for v in ['2022', '2019', '2016', '2012', '2008', '2003']:
+            # Orden inverso para evitar matches parciales si los hubiera
+            for v in ['2025', '2022', '2019', '2016', '2012', '2008', '2003', '2000']:
                 if v in os_lower:
                     version = v
+                    # Caso especial: R2 (endoflife.date a veces distingue, a veces no. Para win serv, ciclo es "2012", no "2012 R2")
                     break
+        
+        # 2. UBUNTU
         elif 'ubuntu' in os_lower:
             product = 'ubuntu'
-            # Extraer XX.04
             import re
-            match = re.search(r'(\d{2}\.04)', os_lower)
+            # Busca XX.04 o XX.10
+            match = re.search(r'(\d{2}\.\d{2})', os_lower)
             if match:
                 version = match.group(1)
+        
+        # 3. RHEL / RED HAT
         elif 'red hat' in os_lower or 'rhel' in os_lower:
             product = 'redhat'
-            # RHEL 7, 8, 9
             import re
-            match = re.search(r'release (\d+)', os_lower)
+            # Busca numero entero principal: "Release 7", "RHEL 8.4" -> ciclo es "7", "8"
+            match = re.search(r'(?:release|rhel)\s*(\d+)', os_lower)
+            if not match: 
+                 # Intento fallback simple: buscar digito suelto si dice "enterprise linux"
+                 match = re.search(r'linux\s*(\d+)', os_lower)
+            
+            if match:
+                version = match.group(1)
+        
+        # 4. CENTOS
+        elif 'centos' in os_lower:
+            product = 'centos'
+            import re
+            # CentOS 7, CentOS 8
+            match = re.search(r'centos\s*(?:linux\s*)?(\d+)', os_lower)
+            if match:
+                version = match.group(1)
+                
+        # 5. DEBIAN
+        elif 'debian' in os_lower:
+            product = 'debian'
+            import re
+            # Debian 10, 11
+            match = re.search(r'debian\s*(?:linux\s*)?(\d+)', os_lower)
             if match:
                 version = match.group(1)
 
-        # Evaluar fecha
+        # --- EVALUACIÓN ---
         if product and version and product in self.lifecycle_data:
+            # Normalizar version a string
+            version = str(version)
+            
+            # Caso especial RHEL/CentOS: API usa "7", "8" etc.
+            
             eol_str = self.lifecycle_data[product].get(version)
+            
             if eol_str:
-                if isinstance(eol_str, bool): # Support puede ser boleano false
+                if isinstance(eol_str, bool): # False = no eol yet? or boolean support flag
+                     # En endoflife.date, 'eol' puede ser booleano false si aun está vivo sin fecha? No, suele ser fecha o bool.
+                     # Si es False, significa que no ha muerto.
+                     if eol_str is False:
+                         return {'status': 'OK', 'eol_date': 'Supported'}
                      return {'status': 'EOL', 'eol_date': 'Expired'}
                 
                 try:
-                    eol_date = date.fromisoformat(eol_str)
+                    # eol_str date format YYYY-MM-DD
+                    eol_date = date.fromisoformat(str(eol_str))
                     today = date.today()
                     days_to_eol = (eol_date - today).days
                     
@@ -103,6 +153,7 @@ class RiskRadar:
                     else:
                         return {'status': 'OK', 'eol_date': eol_str}
                 except ValueError:
-                    pass
+                     # Si no es fecha ISO, asumimos texto informativo
+                     pass
 
         return {'status': 'UNKNOWN', 'eol_date': None}
