@@ -12,7 +12,7 @@ import pandas as pd
 from typing import Optional
 
 from src.core.metrics import InventoryMetrics
-from src.ui import charts
+from src.ui import charts, styles
 import src.core.reporter as reporter
 from src.core.comparator import InventoryComparator
 from src.core.risk import RiskRadar
@@ -21,90 +21,28 @@ import io
 
 def aplicar_estilos():
     """Estilos CSS que respetan el tema de Streamlit (Dark/Light)."""
-    st.markdown("""
-    <style>
-        /* === VARIABLES QUE SE ADAPTAN AL TEMA === */
-        
-        /* === CONTENEDOR PRINCIPAL === */
-        .block-container {
-            padding: 1.5rem 2rem !important;
-            max-width: 1500px !important;
-        }
-        
-        /* === TARJETAS DE MÉTRICAS (Transparencia con borde sutil) === */
-        [data-testid="stMetric"] {
-            background-color: rgba(128, 128, 128, 0.05); /* Funciona en dark y light */
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 1px solid rgba(128, 128, 128, 0.1);
-            text-align: center;
-        }
-        
-        /* Ajuste de fuentes para layout compacto */
-        [data-testid="stMetricValue"] {
-            font-size: 1.8rem !important;
-            font-weight: 700 !important;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 0.8rem !important;
-            font-weight: 600 !important;
-            text-transform: uppercase !important;
-            opacity: 0.8;
-        }
-        
-        /* === HEADERS CON BORDE INFERIOR === */
-        h1, h2, h3 {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-        }
-        
-        h3 {
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 5px;
-            margin-bottom: 15px !important;
-            font-size: 1.2rem !important;
-            opacity: 0.9;
-        }
-        
-        /* === ALINEACIÓN DE GRÁFICOS === */
-        .js-plotly-plot {
-            height: 500px !important; /* Altura generosa para evitar cortes */
-        }
-        
-        /* === SIDEBAR === */
-        [data-testid="stSidebar"] {
-            border-right: 1px solid rgba(128, 128, 128, 0.1);
-        }
-        
-        /* === IMPRESIÓN (Forzar Blanco/Negro) === */
-        @media print {
-            .stApp, .block-container, body {
-                background: white !important;
-            }
-            [data-testid="stSidebar"], header, footer, button, .stDownloadButton {
-                display: none !important;
-            }
-            * {
-                color: black !important;
-                box-shadow: none !important;
-            }
-            [data-testid="stMetric"] {
-                border: 1px solid #000;
-            }
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown(styles.load_css(), unsafe_allow_html=True)
 
 
 def renderizar_header():
-    """Encabezado que se ve bien en ambos temas."""
-    st.markdown("""
-    <div style="padding: 1rem 0 2rem 0; text-align: left; border-bottom: 1px solid rgba(128,128,128,0.2); margin-bottom: 1rem;">
-        <h1 style="margin: 0; font-size: 2rem; letter-spacing: 1px;">
-            🛡️ CONTROL DE PLATAFORMA XTRIM
-        </h1>
-        <p style="margin: 0.5rem 0 0 0; opacity: 0.7; font-size: 1rem; letter-spacing: 2px; text-transform: uppercase;">
-            RADIOGRAFÍA EJECUTIVA DE INFRAESTRUCTURA
-        </p>
+    """Encabezado Premium con Timestamp."""
+    import datetime
+    now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    st.markdown(f"""
+    <div style="padding: 1rem 0 2rem 0; display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid rgba(128,128,128,0.2); margin-bottom: 2rem;">
+        <div>
+            <h1 style="margin: 0; font-size: 2.5rem; letter-spacing: -1px; font-weight: 700; background: -webkit-linear-gradient(45deg, #eee, #999); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                PANEL DE CONTROL XTRIM 
+            </h1>
+            <p style="margin: 0.5rem 0 0 0; opacity: 0.6; font-size: 0.9rem; letter-spacing: 2px; text-transform: uppercase; font-family: 'Inter', sans-serif;">
+                INFRAESTRUCTURA & SERVIDORES | <span style="color: #4CAF50;">● EN LÍNEA</span>
+            </p>
+        </div>
+        <div style="text-align: right; opacity: 0.5; font-size: 0.8rem; font-family: 'Inter', sans-serif;">
+            ÚLTIMA ACTUALIZACIÓN<br>
+            <strong style="font-size: 1rem; color: var(--text-color);">{now}</strong>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -244,20 +182,33 @@ def render(metricas: InventoryMetrics, metricas_anteriores: Optional[InventoryMe
             st.metric("Backup Delta", f"{cambios['kpi_deltas']['backup_coverage']:+.0f}%")
             
         # Delta Details (Expandable)
-        with st.expander("📝 Ver Detalles de Altas y Bajas"):
-            d_col1, d_col2 = st.columns(2)
+        with st.expander("📝 Ver Detalles de Altas, Bajas y Cambios"):
+            d_col1, d_col2, d_col3 = st.columns(3)
             with d_col1:
-                st.write("**🔽 Bajas (No detectados en carga actual):**")
+                st.write("**🔽 Bajas (Decomisos):**")
                 if cambios['details']['removed_hosts']:
                     st.error(", ".join(cambios['details']['removed_hosts'][:50]))
                 else:
                     st.caption("Sin bajas detectadas.")
             with d_col2:
-                st.write("**🔼 Altas (Nuevos en esta carga):**")
+                st.write("**🔼 Altas (Nuevos):**")
                 if cambios['details']['added_hosts']:
                     st.success(", ".join(cambios['details']['added_hosts'][:50]))
                 else:
                     st.caption("Sin nuevas altas.")
+            with d_col3:
+                st.write("**⚠️ Modificados:**")
+                mods = cambios['details'].get('modified_hosts', [])
+                if mods:
+                    st.warning(f"{len(mods)} servidores con cambios.")
+                else:
+                    st.caption("Sin cambios en propiedades.")
+
+            # Tabla de detalle de modificaciones
+            if cambios['details'].get('modified_hosts'):
+                st.markdown("##### 🛠️ Detalle de Modificaciones")
+                df_mods = pd.DataFrame(cambios['details']['modified_hosts'])
+                st.dataframe(df_mods, use_container_width=True, hide_index=True)
         st.markdown("---")
 
     renderizar_kpis_ejecutivos(m, resumen)
