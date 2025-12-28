@@ -21,42 +21,54 @@ def main():
 
     # Sidebar: File Upload
     with st.sidebar:
-        st.header("📂 Configuración")
-        uploaded_file = st.file_uploader("Cargar Inventario Actual (Excel)", type=["xlsx"], key="current")
+        st.header("📂 Gestión de Datos")
         
-        # Historical Comparison
+        # Scenario: User uploads a NEW file to compare against existing data
+        st.info("💡 Para comparar cambios, carga el nuevo archivo aquí:")
+        uploaded_file = st.file_uploader("Cargar Nuevo Inventario (Excel)", type=["xlsx"], key="current")
+        
         st.markdown("---")
-        st.subheader("📊 Comparación Histórica")
-        st.caption("Sube un archivo de mes anterior para ver cambios.")
-        previous_file = st.file_uploader("Inventario Anterior (Opcional)", type=["xlsx"], key="previous")
-        st.divider()
+        if uploaded_file:
+            st.warning("⚠️ Modo Comparación Activo\n(Nuevo vs Base)")
+        else:
+            st.success("✅ Modo Base Activo\n(Visualizando Datos del Sistema)")
+
 
     try:
-        # Determine Source for CURRENT data
-        source = uploaded_file if uploaded_file else EXCEL_FILE
+        # 1. Siempre cargamos la BASE del sistema (Previous/Baseline)
+        base_df = None
+        base_metrics = None
         
-        # Load Data
-        with st.spinner("Cargando inventario actual..."):
-            # Check existence only if using default file
-            if source == EXCEL_FILE and not EXCEL_FILE.exists():
-                st.error(f"❌ No se encontró el archivo de datos en: {EXCEL_FILE}")
-                st.info("Por favor mapea el volumen 'data' conteniendo 'INVENTARIO SRV.xlsx' o sube un archivo.")
+        if EXCEL_FILE.exists():
+            base_raw = load_data(EXCEL_FILE)
+            base_df = clean_data(base_raw)
+            base_metrics = InventoryMetrics(base_df)
+        else:
+            if not uploaded_file:
+                st.error(f"❌ No se encuentra el archivo base: {EXCEL_FILE}")
                 return
 
-            raw_df = load_data(source)
-            df = clean_data(raw_df)
-            current_metrics = InventoryMetrics(df)
-
-        # Load PREVIOUS data if provided
+        # 2. Determinamos qué mostrar
+        current_metrics = None
         previous_metrics = None
-        if previous_file:
-            with st.spinner("Cargando inventario anterior para comparación..."):
-                prev_raw_df = load_data(previous_file)
-                prev_df = clean_data(prev_raw_df)
-                previous_metrics = InventoryMetrics(prev_df)
 
-        # Render UI with both current and optional previous metrics
-        layout.render(current_metrics, previous_metrics)
+        if uploaded_file:
+            # Caso: Comparación
+            with st.spinner("Procesando nuevo archivo..."):
+                curr_raw = load_data(uploaded_file)
+                curr_df = clean_data(curr_raw)
+                current_metrics = InventoryMetrics(curr_df)
+                
+                # La base se convierte en "Anterior"
+                previous_metrics = base_metrics
+        else:
+            # Caso: Normal
+            current_metrics = base_metrics
+            previous_metrics = None
+
+        if current_metrics:
+            # Render UI
+            layout.render(current_metrics, previous_metrics)
         
     except Exception as e:
         st.error(f"Error crítico en la aplicación: {e}")

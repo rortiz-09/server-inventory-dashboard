@@ -64,12 +64,33 @@ def main():
         if 'HOSTNAME' not in df.columns:
             df['HOSTNAME'] = "SRV-DESCONOCIDO"
 
+    # --- 1.6 Pre-procesamiento de IPs (Coalesce) ---
+    col_ip_int = next((c for c in df.columns if 'IP INTERNA' in c), None)
+    col_ip_blade = next((c for c in df.columns if 'IP DEL BLADE' in c), None)
+    
+    if col_ip_int and col_ip_blade:
+         df['IP_ADDRESS'] = df[col_ip_int].fillna(df[col_ip_blade])
+    elif col_ip_int:
+         df['IP_ADDRESS'] = df[col_ip_int]
+    elif col_ip_blade:
+         df['IP_ADDRESS'] = df[col_ip_blade]
+    else:
+         if 'IP_ADDRESS' not in df.columns:
+             df['IP_ADDRESS'] = None
+
+    # Eliminar columnas fuente para evitar duplicados en rename
+    cols_to_drop = [col_ip_int, col_ip_blade, col_fisico, col_virtual]
+    cols_to_drop = [c for c in cols_to_drop if c and c in df.columns]
+    if cols_to_drop:
+        df.drop(columns=cols_to_drop, inplace=True)
+
     # --- 2. Selección y Renombrado de Columnas ---
     
     # Mapeo de columnas originales -> Estandar (User Defined)
     mapping = {
         'HOSTNAME': 'HOSTNAME',
-        'IP INTERNA': 'IP_ADDRESS',
+        'IP_ADDRESS': 'IP_ADDRESS', # Preservar la que acabamos de crear
+        'IP INTERNA': 'IP_ADDRESS', # Fallback
         'TIPO DE SERVIDOR': 'TIPO',
         'SISTEMA OPERATIVO': 'OS',
         'APLICACIÓN': 'APLICACION',
