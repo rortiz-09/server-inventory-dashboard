@@ -12,7 +12,7 @@ import pandas as pd
 import numpy as np
 import re
 from typing import Dict, Any
-from src.config import COLUMN_MAPPING, OS_MAPPING
+from src.config import COLUMN_MAPPING
 
 
 def limpiar_nombres_columnas(df: pd.DataFrame) -> pd.DataFrame:
@@ -236,15 +236,31 @@ def limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
     # Paso 4: Normalizar sistema operativo (Detallado pero limpio)
     df['os'] = df['os'].apply(normalizar_sistema_operativo)
     
-    # Paso 5: Limpiar campos de texto
-    df['location'] = df['location'].apply(lambda x: limpiar_texto(x, 'DESCONOCIDO'))
-    df['datacenter'] = df['datacenter'].apply(lambda x: limpiar_texto(x, 'NO DEFINIDO'))
-    df['environment'] = df['environment'].apply(lambda x: limpiar_texto(x, 'DESCONOCIDO'))
-    df['application'] = df['application'].apply(lambda x: limpiar_texto(x, 'DESCONOCIDO'))
-    df['criticality'] = df['criticality'].apply(lambda x: limpiar_texto(x, 'NO CLASIFICADO'))
+    # Paso 5: Limpiar campos de texto (Vectorizado)
+    campos_texto = {
+        'location': 'DESCONOCIDO',
+        'datacenter': 'NO DEFINIDO', 
+        'environment': 'DESCONOCIDO',
+        'application': 'DESCONOCIDO',
+        'criticality': 'NO CLASIFICADO'
+    }
     
-    # Paso 6: Mapear códigos de ubicación a nombres
-    df['location'] = df['location'].apply(mapear_ubicacion)
+    for campo, default in campos_texto.items():
+        if campo in df.columns:
+            # 1. Convertir a string, manejar NaN
+            df[campo] = df[campo].fillna(default).astype(str)
+            # 2. Limpieza (Uppercasing, Stripping)
+            df[campo] = df[campo].str.strip().str.upper()
+            # 3. Reemplazar valores vacíos o nulos textuales
+            mask_invalid = df[campo].isin(["NAN", "NONE", "N/A", "NA", ""])
+            df.loc[mask_invalid, campo] = default
+
+    # Paso 6: Mapear códigos de ubicación a nombres (Vectorizado)
+    # Definimos el diccionario de mapeo
+    mapeo_ciudades = {'UIO': 'QUITO', 'GYE': 'GUAYAQUIL', 'CUE': 'CUENCA', 'MAN': 'MANTA', 'AMB': 'AMBATO'}
+    
+    # Usamos .replace() que es mucho más rápido que apply en todo el dataframe o series
+    df['location'] = df['location'].replace(mapeo_ciudades)
     
     # Paso 7: Normalizar has_backup (TIENE BACKUP)
     if 'has_backup' in df.columns:

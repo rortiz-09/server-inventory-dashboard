@@ -76,16 +76,4 @@ COLUMN_MAPPING = {
 }
 
 
-# === NORMALIZACIÓN DE VALORES ===
-OS_MAPPING = {
-    "WIN": "Windows",
-    "WINDOWS": "Windows",
-    "LINUX": "Linux",
-    "RHEL": "Linux",
-    "UBUNTU": "Linux",
-    "CENTOS": "Linux",
-    "DEBIAN": "Linux",
-    "ORACLE LINUX": "Linux",
-    "ESXI": "ESXi",
-    "VMWARE": "ESXi",
-}
+
